@@ -287,4 +287,17 @@ public partial class MainWindow
                 break;
         }
     }
+
+    private async void OnFolderConvertClick(object sender, RoutedEventArgs e)
+    {
+        if (AssetsFolderName.SelectedItem is TreeItem folder)
+        {
+            await _threadWorkerView.Begin(cancellationToken => { _applicationView.CUE4Parse.ConvertFolder(cancellationToken, folder); });
+            FLogger.Append(ELog.Information, () =>
+            {
+                FLogger.Text("Successfully converted C++ files from ", Constants.WHITE);
+                FLogger.Link(folder.PathAtThisPoint, UserSettings.Default.RawDataDirectory, true);
+            });
+        }
+    }
 }

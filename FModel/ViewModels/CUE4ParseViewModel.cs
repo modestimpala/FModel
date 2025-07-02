@@ -1096,13 +1096,15 @@ public class CUE4ParseViewModel : ViewModel
                                        !entry.Extension.Equals("umap", StringComparison.OrdinalIgnoreCase)))
             {
                 FLogger.Append(ELog.Warning, () =>
-                    FLogger.Text($"File '{entry.Name}' is not a valid UE package for C++ conversion", Constants.WHITE, true));
+                    FLogger.Text($"File '{entry.Name}' is not a valid UE package for C++ conversion", Constants.WHITE,
+                        true));
                 return;
             }
 
-            // Use the new converter library
+            // Use the new converter library with cancellation token
             var converter = new BlueprintToCppConverter();
-            var result = await converter.ConvertBlueprintAsync(Provider, entry.Path);
+            var result =
+                await converter.ConvertBlueprintAsync(Provider, entry.Path, cancellationToken: cancellationToken);
 
             if (result.Success && result.ConvertedFiles.Any())
             {
@@ -1127,6 +1129,11 @@ public class CUE4ParseViewModel : ViewModel
                 FLogger.Append(ELog.Warning, () =>
                     FLogger.Text($"Conversion failed: {errorMessage}", Constants.WHITE, true));
             }
+        }
+        catch (OperationCanceledException)
+        {
+            FLogger.Append(ELog.Information, () =>
+                FLogger.Text("C++ conversion was cancelled", Constants.WHITE, true));
         }
         catch (Exception ex)
         {
@@ -1202,5 +1209,77 @@ public class CUE4ParseViewModel : ViewModel
     private static bool HasFlag(EBulkType a, EBulkType b)
     {
         return (a & b) == b;
+    }
+
+    // Converts all compatible assets in the given folder to C++ and saves them to disk
+    public void ConvertFolder(CancellationToken cancellationToken, TreeItem folder)
+    {
+        var converter = new BlueprintToCppConverter();
+
+        // Process assets in this folder
+        Parallel.ForEach(folder.AssetsList.Assets,
+            new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellationToken
+            }, entry =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!entry.IsUePackage || (!entry.Extension.Equals("uasset", StringComparison.OrdinalIgnoreCase) &&
+                                           !entry.Extension.Equals("umap", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return; // Skip non-UE packages
+                }
+
+                try
+                {
+                    // Use GetAwaiter().GetResult() to make async call synchronous with cancellation token
+                    var result = converter
+                        .ConvertBlueprintAsync(Provider, entry.Path, cancellationToken: cancellationToken)
+                        .GetAwaiter().GetResult();
+
+                    if (result.Success && result.ConvertedFiles.Any())
+                    {
+                        // Save each converted file
+                        foreach (var convertedFile in result.ConvertedFiles)
+                        {
+                            var cppPath = Path.Combine(UserSettings.Default.RawDataDirectory,
+                                    UserSettings.Default.KeepDirectoryStructure
+                                        ? convertedFile.OriginalPath.Replace(".uasset", ".cpp").Replace(".umap", ".cpp")
+                                        : convertedFile.FileName)
+                                .Replace('\\', '/');
+
+                            Directory.CreateDirectory(cppPath.SubstringBeforeLast('/'));
+                            File.WriteAllText(cppPath, convertedFile.CppContent);
+
+                            Log.Information("Successfully converted and saved {FileName} as C++",
+                                convertedFile.FileName);
+                        }
+                    }
+                    else
+                    {
+                        var errorMessage = result.Errors.Any()
+                            ? result.Errors.First()
+                            : "No Blueprint or Verse class found";
+                        Log.Warning("C++ conversion failed for {EntryName}: {Error}", entry.Name, errorMessage);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Re-throw cancellation to stop the parallel processing
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error("Error converting {EntryName} to C++: {Exception}", entry.Name, ex);
+                }
+            });
+
+        // Recursively process subfolders
+        foreach (var subfolder in folder.Folders)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ConvertFolder(cancellationToken, subfolder);
+        }
     }
 }
