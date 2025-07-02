@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using CUE4Parse.FileProvider;
 using CUE4Parse.UE4.Assets;
@@ -29,7 +30,8 @@ public class BlueprintToCppConverter
     public async Task<BlueprintConversionResult> ConvertBlueprintAsync(
         IFileProvider provider,
         string blueprintPath,
-        string outputDirectory = null)
+        string outputDirectory = null,
+        CancellationToken cancellationToken = default)
     {
         var results = new List<ConvertedFile>();
         var errors = new List<string>();
@@ -41,33 +43,55 @@ public class BlueprintToCppConverter
 
             foreach (var (folder, packages) in files)
             {
-                Parallel.ForEach(packages, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                    package =>
+                // Add cancellation check before each folder
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var parallelOptions = new ParallelOptions
+                {
+                    MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = cancellationToken
+                };
+
+                Parallel.ForEach(packages, parallelOptions, package =>
+                {
+                    // Check for cancellation at the start of each package processing
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    try
                     {
-                        try
+                        var result = ProcessPackage(provider, package, outputDirectory, cancellationToken);
+                        if (result != null)
                         {
-                            var result = ProcessPackage(provider, package, outputDirectory);
-                            if (result != null)
+                            lock (results)
                             {
-                                lock (results)
-                                {
-                                    results.Add(result);
-                                }
+                                results.Add(result);
                             }
                         }
-                        catch (Exception ex)
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Re-throw cancellation exceptions
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        lock (errors)
                         {
-                            lock (errors)
-                            {
-                                errors.Add($"Error processing {package.Path}: {ex.Message}");
-                            }
+                            errors.Add($"Error processing {package.Path}: {ex.Message}");
                         }
-                    });
+                    }
+                });
             }
 
             return new BlueprintConversionResult
             {
                 ConvertedFiles = results, Errors = errors, Success = errors.Count == 0
+            };
+        }
+        catch (OperationCanceledException)
+        {
+            return new BlueprintConversionResult
+            {
+                ConvertedFiles = results, Errors = new List<string> { "Conversion was cancelled" }, Success = false
             };
         }
         catch (Exception ex)
@@ -112,8 +136,12 @@ public class BlueprintToCppConverter
         return files;
     }
 
-    private ConvertedFile ProcessPackage(IFileProvider provider, GameFile package, string outputDirectory)
+    private ConvertedFile ProcessPackage(IFileProvider provider, GameFile package, string outputDirectory,
+        CancellationToken cancellationToken)
     {
+        // Check for cancellation at the start of package processing
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (!package.IsUePackage)
             return null;
 
@@ -122,6 +150,9 @@ public class BlueprintToCppConverter
 
         for (var i = 0; i < pkg.ExportMapLength; i++)
         {
+            // Check for cancellation during export processing
+            cancellationToken.ThrowIfCancellationRequested();
+
             var pointer = new FPackageIndex(pkg, i + 1).ResolvedObject;
             if (pointer?.Object is null)
                 continue;
@@ -146,7 +177,11 @@ public class BlueprintToCppConverter
 
                     if (blueprintGeneratedClass != null || _isVerse)
                     {
-                        var cppContent = GenerateCppContent(pkg, blueprintGeneratedClass, verseClass);
+                        // Check for cancellation before generating C++ content
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        var cppContent =
+                            GenerateCppContent(pkg, blueprintGeneratedClass, verseClass, cancellationToken);
                         var fileName = $"{package.Name.Replace(".uasset", "")}.cpp";
 
                         string outputPath = null;
@@ -177,8 +212,11 @@ public class BlueprintToCppConverter
     }
 
     private string GenerateCppContent(IPackage pkg, UBlueprintGeneratedClass blueprintGeneratedClass,
-        UVerseClass verseClass)
+        UVerseClass verseClass, CancellationToken cancellationToken)
     {
+        // Check for cancellation at the start of content generation
+        cancellationToken.ThrowIfCancellationRequested();
+
         var outputBuilder = new StringBuilder();
 
         var mainClass = blueprintGeneratedClass?.Name ?? verseClass?.Name;
@@ -189,10 +227,11 @@ public class BlueprintToCppConverter
             $"class {BlueprintToCppUtils.GetPrefix(blueprintGeneratedClass?.GetType().Name ?? verseClass?.GetType().Name)}{mainClass} : public {BlueprintToCppUtils.GetPrefix(blueprintGeneratedClass?.GetType().Name ?? verseClass?.GetType().Name)}{superStructName}\n{{\npublic:");
 
         // Process properties
-        var stringsarray = ProcessProperties(pkg, outputBuilder, mainClass, blueprintGeneratedClass, verseClass);
+        var stringsarray = ProcessProperties(pkg, outputBuilder, mainClass, blueprintGeneratedClass, verseClass,
+            cancellationToken);
 
         // Process functions
-        ProcessFunctions(pkg, outputBuilder, blueprintGeneratedClass, verseClass, stringsarray);
+        ProcessFunctions(pkg, outputBuilder, blueprintGeneratedClass, verseClass, stringsarray, cancellationToken);
 
         outputBuilder.Append("\n\n}");
 
@@ -202,12 +241,15 @@ public class BlueprintToCppConverter
     }
 
     private List<string> ProcessProperties(IPackage pkg, StringBuilder outputBuilder, string mainClass,
-        UBlueprintGeneratedClass blueprintGeneratedClass, UVerseClass verseClass)
+        UBlueprintGeneratedClass blueprintGeneratedClass, UVerseClass verseClass, CancellationToken cancellationToken)
     {
         var stringsarray = new List<string>();
 
         foreach (var export in pkg.ExportsLazy)
         {
+            // Check for cancellation during property processing
+            cancellationToken.ThrowIfCancellationRequested();
+
             if (export.Value is not UBlueprintGeneratedClass)
             {
                 if (export.Value.Name.StartsWith("Default__") && export.Value.Name.EndsWith(mainClass ?? string.Empty))
@@ -215,6 +257,8 @@ public class BlueprintToCppConverter
                     var exportObject = export.Value;
                     foreach (var key in exportObject.Properties)
                     {
+                        // Check for cancellation for each property
+                        cancellationToken.ThrowIfCancellationRequested();
                         ProcessSingleProperty(key, outputBuilder, stringsarray);
                     }
                 }
@@ -226,6 +270,9 @@ public class BlueprintToCppConverter
         {
             foreach (FProperty property in childProperties)
             {
+                // Check for cancellation for each child property
+                cancellationToken.ThrowIfCancellationRequested();
+
                 if (!stringsarray.Contains(property.Name.PlainText))
                     outputBuilder.AppendLine(
                         $"\t{BlueprintToCppUtils.GetPrefix(property.GetType().Name)}{BlueprintToCppUtils.GetPropertyType(property)}{(property.PropertyFlags.HasFlag(EPropertyFlags.InstancedReference) || property.PropertyFlags.HasFlag(EPropertyFlags.ReferenceParm) || BlueprintToCppUtils.GetPropertyProperty(property) ? "*" : string.Empty)} {property.Name.PlainText.Replace(" ", "")} = {property.Name.PlainText.Replace(" ", "")}placenolder;");
@@ -490,7 +537,8 @@ public class BlueprintToCppConverter
     }
 
     private void ProcessFunctions(IPackage pkg, StringBuilder outputBuilder,
-        UBlueprintGeneratedClass blueprintGeneratedClass, UVerseClass verseClass, List<string> stringsarray)
+        UBlueprintGeneratedClass blueprintGeneratedClass, UVerseClass verseClass, List<string> stringsarray,
+        CancellationToken cancellationToken)
     {
         var funcMapOrder = blueprintGeneratedClass?.FuncMap?.Keys.Select(fname => fname.ToString()).ToList()
                            ?? verseClass?.FuncMap.Keys.Select(fname => fname.ToString()).ToList();
@@ -516,9 +564,12 @@ public class BlueprintToCppConverter
 
         foreach (var function in functions)
         {
+            // Check for cancellation before processing each function
+            cancellationToken.ThrowIfCancellationRequested();
             ProcessSingleFunction(function, outputBuilder, jumpCodeOffsetsMap);
         }
     }
+
 
     private Dictionary<string, List<int>> BuildJumpCodeOffsetsMap(List<UFunction> functions)
     {
@@ -591,8 +642,6 @@ public class BlueprintToCppConverter
             outputBuilder.Append("\n\t // This function does not have Bytecode \n\n");
             outputBuilder.Append("\t}\n");
         }
-
-
     }
 
     private string BuildArgumentsList(UFunction function)
@@ -1124,8 +1173,9 @@ public class BlueprintToCppConverter
 
                 if (classString?.Contains(".") == true)
                 {
-                    outputBuilder.Append(BlueprintToCppUtils.GetPrefix(op?.Value?.ResolvedObject?.Class?.GetType().Name) +
-                                         classString.Split(".")[1]);
+                    outputBuilder.Append(
+                        BlueprintToCppUtils.GetPrefix(op?.Value?.ResolvedObject?.Class?.GetType().Name) +
+                        classString.Split(".")[1]);
                 }
                 else
                 {
