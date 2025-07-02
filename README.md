@@ -1,8 +1,9 @@
 # "Convert to C++" Function Fork
-### This is a fork of the original FModel repository, which adds a "Convert to C++" function.
+### This is a fork of the original [FModel](https://github.com/4sval/FModel) repository that adds a "Convert to C++" function / bulk .cpp conversion
  Right click on an asset and select "Convert to C++" to open a tab with the converted C++ code of the Blueprint.
+ Right click on a folder to bulk convert it and all subfolders to C++.
 
- Original BlueprintToCpp code from [Krowe-moh](https://github.com/Krowe-moh/BlueprintToCpp) and [FModel](https://github.com/4sval/FModel)
+ Original BlueprintToCpp code from [Krowe-moh](https://github.com/Krowe-moh/BlueprintToCpp)  
  
 ![Screenshot 2025-07-01 220900](https://github.com/user-attachments/assets/a43ab878-24ff-45ba-a8ea-79048b63af21) ![image](https://github.com/user-attachments/assets/4523c182-ad2b-4f0c-8ea3-583b3aceb452)
 
