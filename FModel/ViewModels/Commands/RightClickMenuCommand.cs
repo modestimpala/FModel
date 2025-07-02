@@ -84,6 +84,14 @@ public class RightClickMenuCommand : ViewModelCommand<ApplicationViewModel>
                         contextViewModel.CUE4Parse.Extract(cancellationToken, entry, false, EBulkType.Animations | updateUi);
                     }
                     break;
+                case "Assets_Convert_To_Cpp":
+                    foreach (var entry in entries)
+                    {
+                        Thread.Yield();
+                        cancellationToken.ThrowIfCancellationRequested();
+                        contextViewModel.CUE4Parse.ConvertToCpp(cancellationToken, entry);
+                    }
+                    break;
             }
         });
     }

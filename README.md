@@ -1,3 +1,13 @@
+# "Convert to C++" Function Fork
+### This is a fork of the original FModel repository, which adds a "Convert to C++" function.
+ Right click on an asset and select "Convert to C++" to open a tab with the converted C++ code of the Blueprint.
+
+ Original BlueprintToCpp code from [Krowe-moh](https://github.com/Krowe-moh/BlueprintToCpp) and [FModel](https://github.com/4sval/FModel)
+
+
+
+#
+
 FModel - An Unreal Engine Archives Explorer in C#
 ------------------------------------------
 

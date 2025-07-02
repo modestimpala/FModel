@@ -2,26 +2,27 @@
 <!-- syntaxdefinition for C/C++ 2001 by Andrea Paatz and Mike Krueger -->
 <!-- converted to AvalonEdit format by Siegfried Pammer in 2010 -->
 <SyntaxDefinition name="C++" extensions=".c;.h;.cc;.cpp;.hpp" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
-	<Color name="Comment" foreground="Green" />
-	<Color name="Character" foreground="Fuchsia" />
-	<Color name="String" foreground="Fuchsia" />
-	<Color name="Preprocessor" foreground="Green" />
-	<Color name="Punctuation" foreground="DarkGreen" />
-	<Color name="MethodName" foreground="MidnightBlue" fontWeight="bold" />
-	<Color name="Digits" foreground="#F78C6C" />
-	<Color name="CompoundKeywords" foreground="Black" fontWeight="bold" />
-	<Color name="This" foreground="Black" fontWeight="bold" />
-	<Color name="Operators" foreground="#FF008B8B" fontWeight="bold" />
-	<Color name="Namespace" foreground="#FF008000" fontWeight="bold" />
-	<Color name="Friend" foreground="#FFA52A2A" />
-	<Color name="Modifiers" foreground="#FF0000FF" fontWeight="bold" />
-	<Color name="TypeKeywords" foreground="#FFFF0000" />
-	<Color name="BooleanConstants" foreground="#FF000000" fontWeight="bold" />
-	<Color name="Keywords" foreground="#FF0000FF" fontWeight="bold" />
-	<Color name="LoopKeywords" foreground="#FF0000FF" fontWeight="bold" />
-	<Color name="JumpKeywords" foreground="#FF000080" />
-	<Color name="ExceptionHandling" foreground="#FF008080" fontWeight="bold" />
-	<Color name="ControlFlow" foreground="#FF0000FF" fontWeight="bold" />
+	<Color name="Comment" foreground="#6A9955" exampleText="// comment" />
+    <Color name="Character" foreground="#CE9178" exampleText="'c'" />
+    <Color name="String" foreground="#CE9178" exampleText='"Hello World"' />
+    <Color name="Preprocessor" foreground="#C586C0" exampleText="#include #define" />
+    <Color name="Punctuation" foreground="#D4D4D4" exampleText="( ) { } [ ] ; ," />
+    <Color name="MethodName" foreground="#DCDCAA" fontWeight="bold" exampleText="MyFunction(" />
+    <Color name="Digits" foreground="#B5CEA8" exampleText="3.14 42 0xFF" />
+    <Color name="CompoundKeywords" foreground="#569CD6" fontWeight="bold" exampleText="const_cast static_cast" />
+    <Color name="This" foreground="#569CD6" fontWeight="bold" exampleText="this" />
+    <Color name="Operators" foreground="#D4D4D4" fontWeight="bold" exampleText="+ - * / = &lt; &gt;" />
+    <Color name="Namespace" foreground="#4EC9B0" fontWeight="bold" exampleText="std namespace" />
+    <Color name="Friend" foreground="#C586C0" exampleText="friend" />
+    <Color name="Modifiers" foreground="#569CD6" fontWeight="bold" exampleText="public private protected" />
+    <Color name="TypeKeywords" foreground="#4EC9B0" exampleText="int float double bool" />
+    <Color name="BooleanConstants" foreground="#569CD6" fontWeight="bold" exampleText="true false" />
+    <Color name="Keywords" foreground="#569CD6" fontWeight="bold" exampleText="class struct enum" />
+    <Color name="LoopKeywords" foreground="#C586C0" fontWeight="bold" exampleText="for while do" />
+    <Color name="JumpKeywords" foreground="#FF6B6B" exampleText="goto break continue" />
+    <Color name="ExceptionHandling" foreground="#4EC9B0" fontWeight="bold" exampleText="try catch throw" />
+    <Color name="ControlFlow" foreground="#C586C0" fontWeight="bold" exampleText="if else switch case" />
+
 	<RuleSet ignoreCase="false">
 		<Rule color="Punctuation">
 		[?,.;()\[\]{}+\-/%*&lt;&gt;^=~!&amp;]+
